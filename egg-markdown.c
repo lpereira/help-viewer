@@ -490,6 +490,17 @@ egg_markdown_to_text_line_format_sections (EggMarkdown *self, const gchar *line)
 	gchar *data = g_strdup (line);
 	gchar *temp;
 
+	/* smart quoting */
+	if (self->priv->smart_quoting) {
+		temp = data;
+		data = egg_markdown_to_text_line_formatter (temp, "&quot;", "“", "”");
+		g_free (temp);
+
+		temp = data;
+		data = egg_markdown_to_text_line_formatter (temp, "&apos;", "‘", "’");
+		g_free (temp);
+	}
+
 	/* image */
 	temp = data;
 	data = egg_markdown_to_text_line_formatter_image (self, temp);
@@ -524,17 +535,6 @@ egg_markdown_to_text_line_format_sections (EggMarkdown *self, const gchar *line)
 	temp = data;
 	data = egg_markdown_replace (temp, " -- ", " — ");
 	g_free (temp);
-
-	/* smart quoting */
-	if (self->priv->smart_quoting) {
-		temp = data;
-		data = egg_markdown_to_text_line_formatter (temp, "\"", "“", "”");
-		g_free (temp);
-
-		temp = data;
-		data = egg_markdown_to_text_line_formatter (temp, "'", "‘", "’");
-		g_free (temp);
-	}
 
 	return data;
 }

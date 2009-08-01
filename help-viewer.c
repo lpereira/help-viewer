@@ -103,14 +103,19 @@ static void file_load_complete(MarkdownTextView *text_view, gchar *file, gpointe
     g_free(hv->current_file);
     hv->current_file = g_strdup(file);
     
-    gtk_statusbar_push(GTK_STATUSBAR(hv->status_bar), 1, "Done.");
+    gtk_statusbar_push(GTK_STATUSBAR(hv->status_bar), 1, "Done");
 }
 
 static void hovering_over_link(MarkdownTextView *text_view, gchar *link, gpointer data)
 {
     HelpViewer *hv = (HelpViewer *)data;
+    gchar *temp;
     
-    gtk_statusbar_push(GTK_STATUSBAR(hv->status_bar), 1, link);
+    temp = g_strconcat("Link to ", link, NULL);
+    
+    gtk_statusbar_push(GTK_STATUSBAR(hv->status_bar), 1, temp);
+    
+    g_free(temp);
 }
 
 static void hovering_over_text(MarkdownTextView *text_view, gpointer data)

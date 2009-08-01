@@ -3,7 +3,7 @@ GTK_CFLAGS = `pkg-config gtk+-2.0 --cflags`
 
 CCFLAGS = -fPIC -pipe -Wall -g 
 CFLAGS = $(GTK_CFLAGS)
-CC = gcc $(ARCHOPTS) -g $(CFLAGS)
+CC = gcc -Os $(ARCHOPTS) -g $(CFLAGS)
 
 # ----------------------------------------------------------------------------
 

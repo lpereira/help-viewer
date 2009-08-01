@@ -1,7 +1,9 @@
+"""""""""""""""""""""""""""""""""""
+![Help Browser](icon.png)
 
-# help-viewer
+# Help Viewer
 
-`help-viewer` is a simple help file browser, based on a subset of the Markdown syntax. It is intented to be embedded on GTK+ applications which require online documentation but without the dependency of a external help browser (such as GNOME's `yelp`).
+`help-viewer` is a simple help file browser, based on a subset of the Markdown syntax. It is intented to be embedded on GTK+ applications which require online documentation but without the dependency of a external help browser (such as GNOME's `yelp`). 
 
 # Supported syntax
 
@@ -10,7 +12,5 @@
 * [http://hardinfo.org Hyperlinks]
 * Headers (level 1 and level 2)
 * `code`
-
-# Image test
-
-antes ![alt](icon.png) depois
+* Images ![smile](face-smile.png)
+* "Smart" 'quoting'
