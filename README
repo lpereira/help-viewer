@@ -10,3 +10,7 @@
 * [http://hardinfo.org Hyperlinks]
 * Headers (level 1 and level 2)
 * `code`
+
+# Image test
+
+antes ![alt](icon.png) depois

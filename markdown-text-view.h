@@ -60,8 +60,6 @@ gboolean	 markdown_textview_load_file(MarkdownTextView * textview,
 		  	                     const gchar * file_name);
 gboolean 	 markdown_textview_set_text(MarkdownTextView * textview,
                                             const gchar * text);
-gboolean	 markdown_textview_append_text(MarkdownTextView * textview,
-                                               const gchar * text);
 void		 markdown_textview_clear(MarkdownTextView * textview);
 
 G_END_DECLS

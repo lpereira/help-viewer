@@ -146,7 +146,8 @@ help_viewer_new (const gchar *help_file)
   GdkPixbuf *icon;
 
   help_viewer = gtk_window_new (GTK_WINDOW_TOPLEVEL);
-  gtk_widget_set_size_request (help_viewer, 500, 400);
+  gtk_widget_set_size_request(help_viewer, 300, 200);
+  gtk_window_set_default_size(GTK_WINDOW(help_viewer), 640, 480);
   gtk_window_set_title (GTK_WINDOW (help_viewer), "Help Viewer");
   
   icon = gtk_widget_render_icon(help_viewer, GTK_STOCK_HELP, 

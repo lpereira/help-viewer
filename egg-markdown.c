@@ -55,6 +55,7 @@ static void     egg_markdown_finalize	(GObject		*object);
 #define EGG_MARKDOWN_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), EGG_TYPE_MARKDOWN, EggMarkdownPrivate))
 
 typedef gchar *(EggMarkdownLinkBuilder)(gchar *title, gchar *uri, gint link_id);
+typedef gchar *(EggMarkdownImageBuilder)(gchar *alt_text, gchar *path, gint link_id);
 
 typedef enum {
 	EGG_MARKDOWN_MODE_BLANK,
@@ -82,6 +83,7 @@ typedef struct {
 	const gchar *rule;
 	
 	EggMarkdownLinkBuilder *link_builder;
+	EggMarkdownImageBuilder *image_builder;
 } EggMarkdownTags;
 
 struct EggMarkdownPrivate
@@ -333,6 +335,70 @@ out:
 	return data;
 }
 
+static gchar *
+egg_markdown_to_text_line_formatter_image (EggMarkdown *self, const gchar *line)
+{
+	const guint len = 2;	/* needed to know for shifts */
+	gchar *str1;
+	gchar *str2;
+	gchar *start = NULL;
+	gchar *path = NULL;
+	gchar *alt_text = NULL;
+	gchar *end = NULL;
+	gchar *copy = NULL;
+	gchar *data = NULL;
+	gchar *temp;
+
+	/* find sections */
+	copy = g_strdup (line);
+	str1 = egg_markdown_strstr_spaces (copy, "![");
+	if (str1 != NULL) {
+		*str1 = '\0';
+		str2 = egg_markdown_strstr_spaces (str1+len, "]");
+		if (str2 != NULL) {
+			*str2 = '\0';
+			start = copy;
+			alt_text = str1 + len;
+			
+                        str2 = strstr (str2 + 1, "(");
+			if (str2 != NULL) {
+                           *str2 = '\0';
+                           
+                           str1 = strstr (str2 + 1, ")");
+                           if (str1 != NULL) {
+                             *str1 = '\0';
+                             path = str2 + 1;
+                             end = str1 + 1;
+                           }
+			}
+		}
+	}
+	
+	/* if we found, replace and keep looking for the same string */
+	if (start && (path && *path) && alt_text && end) {
+	        gchar *formatted_img;
+	        gchar *path_copy = g_strdup(path);
+	        
+	        g_array_append_val(self->priv->link_table, path_copy);
+	        
+	        formatted_img = self->priv->tags.image_builder(alt_text,
+                                                               path,
+                                                               self->priv->link_table->len - 1);
+	        
+                data = g_strdup_printf ("%s%s%s",
+                                        start, formatted_img, end);
+                
+                g_free(formatted_img);
+	} else {
+		/* not found, keep return as-is */
+		data = g_strdup (line);
+	}
+out:
+	g_free (copy);
+	return data;
+}
+
+
 /**
  * egg_markdown_to_text_line_formatter_link:
  **/
@@ -424,23 +490,15 @@ egg_markdown_to_text_line_format_sections (EggMarkdown *self, const gchar *line)
 	gchar *data = g_strdup (line);
 	gchar *temp;
 
+	/* image */
+	temp = data;
+	data = egg_markdown_to_text_line_formatter_image (self, temp);
+	g_free(temp);
+
 	/* link */
 	temp = data;
 	data = egg_markdown_to_text_line_formatter_link (self, temp);
 	g_free(temp);
-
-	/* image */
-	/* TODO:
-	
-	![Alt text](/path/to/img.jpg)
-	
-	    inserir '/path/to/img.jpg' na link_table
-	    <span lang="n" underline="double">Alt text</span>
-	    
-	    Buscar todas as tags que contenham "underline='double'" e "lang" setados.
-	    Para cada uma, carregar a imagem e inseri-la no texto.
-	
-	*/
 
 	/* bold1 */
 	temp = data;
@@ -865,6 +923,35 @@ egg_markdown_linkbuilder_text (gchar *title, gchar *uri, gint link_id)
 }
 
 /**
+ * egg_markdown_imagebuilder_pango:
+ **/
+static gchar *
+egg_markdown_imagebuilder_pango (gchar *alt_text, gchar *uri, gint link_id)
+{
+       /* FIXME See egg_markdown_linkbuilder_pango() */
+       return g_strdup_printf("<span lang=\"%d\" underline=\"double\">%s</span>",
+                              link_id, alt_text);
+}
+
+/**
+ * egg_markdown_imagebuilder_html
+ **/
+static gchar *
+egg_markdown_imagebuilder_html (gchar *alt_text, gchar *uri, gint link_id)
+{
+        return g_strdup_printf("<img src=\"%s\" alt=\"%s\">", uri, alt_text);
+}
+
+/**
+ * egg_markdown_imagebuilder_text
+ **/
+static gchar *
+egg_markdown_imagebuilder_text (gchar *alt_text, gchar *uri, gint link_id)
+{
+        return g_strdup(alt_text);
+}
+
+/**
  * egg_markdown_set_output:
  **/
 gboolean
@@ -889,6 +976,7 @@ egg_markdown_set_output (EggMarkdown *self, EggMarkdownOutput output)
 		self->priv->tags.bullett_end = "";
 		self->priv->tags.rule = "⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n";
 		self->priv->tags.link_builder = egg_markdown_linkbuilder_pango;
+		self->priv->tags.image_builder = egg_markdown_imagebuilder_pango;
 
 	/* XHTML */
 	} else if (output == EGG_MARKDOWN_OUTPUT_HTML) {
@@ -906,6 +994,7 @@ egg_markdown_set_output (EggMarkdown *self, EggMarkdownOutput output)
 		self->priv->tags.bullett_end = "</li>";
 		self->priv->tags.rule = "<hr>";
 		self->priv->tags.link_builder = egg_markdown_linkbuilder_html;
+		self->priv->tags.image_builder = egg_markdown_imagebuilder_html;
 
 	/* plain text */
 	} else if (output == EGG_MARKDOWN_OUTPUT_TEXT) {
@@ -923,6 +1012,7 @@ egg_markdown_set_output (EggMarkdown *self, EggMarkdownOutput output)
 		self->priv->tags.bullett_end = "";
 		self->priv->tags.rule = " ----- \n";
 		self->priv->tags.link_builder = egg_markdown_linkbuilder_text;
+		self->priv->tags.image_builder = egg_markdown_imagebuilder_text;
 
 	/* unknown */
 	} else {

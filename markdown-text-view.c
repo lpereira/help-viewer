@@ -263,7 +263,7 @@ set_cursor_if_appropriate(MarkdownTextView * self, gint x, gint y)
 		     "language", &lang,
 		     NULL);
 
-	if (is_underline && lang) {
+	if (is_underline == 1 && lang) {
 	    link_uri = egg_markdown_get_link_uri(self->markdown, atoi(lang));
 	    g_free(lang);
 	    hovering = TRUE;
@@ -350,7 +350,7 @@ follow_if_link(GtkWidget * widget, GtkTextIter * iter)
 		     "language", &lang,
 		     NULL);
 
-	if (is_underline && lang) {
+	if (is_underline == 1 && lang) {
 	    gchar *link = egg_markdown_get_link_uri(self->markdown, atoi(lang));
 	    if (link) {
 	        g_signal_emit(self, markdown_textview_signals[LINK_CLICKED],
@@ -440,9 +440,66 @@ markdown_textview_clear(MarkdownTextView * self)
     gtk_text_buffer_set_text(text_buffer, "\n", 1);
 }
 
-gboolean
-markdown_textview_append_text(MarkdownTextView * self,
-                              const gchar * text)
+static void
+load_images(MarkdownTextView * self)
+{
+    GtkTextBuffer *buffer;
+    GtkTextIter iter;
+    GSList *tags, *tagp;
+    gchar *image_path;
+    
+    buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(self));
+    gtk_text_buffer_get_start_iter(buffer, &iter);
+    
+    do {
+       tags = gtk_text_iter_get_tags(&iter);
+       for (tagp = tags; tagp != NULL; tagp = tagp->next) {
+           GtkTextTag *tag = tagp->data;
+           gint is_underline = 0;
+           gchar *lang = NULL;
+
+           g_object_get(G_OBJECT(tag),
+                        "underline", &is_underline,
+                        "language", &lang,
+                        NULL);
+
+           if (is_underline == 2 && lang) {
+               GdkPixbuf *pixbuf;
+               
+               image_path = egg_markdown_get_link_uri(self->markdown, atoi(lang));
+               pixbuf = gdk_pixbuf_new_from_file(image_path, NULL);
+               if (pixbuf) {
+                   GtkTextMark *mark;
+                   GtkTextIter start;
+
+                   mark = gtk_text_buffer_create_mark(buffer, NULL, &iter, FALSE);
+                   
+                   gtk_text_buffer_get_iter_at_mark(buffer, &start, mark);
+                   gtk_text_iter_forward_to_tag_toggle(&iter, tag);
+                   gtk_text_buffer_delete(buffer, &start, &iter);
+
+                   gtk_text_buffer_insert_pixbuf(buffer, &iter, pixbuf);
+  
+                   g_object_unref(pixbuf);
+                   gtk_text_buffer_delete_mark(buffer, mark);
+               }
+               
+               g_free(image_path);
+               g_free(lang);
+               break;
+           }
+
+           g_free(lang);
+       }
+       
+       if (tags)
+           g_slist_free(tags);
+   } while (gtk_text_iter_forward_to_tag_toggle(&iter, NULL));
+}
+
+static gboolean
+append_text(MarkdownTextView * self,
+            const gchar * text)
 {
     GtkTextIter iter;
     GtkTextBuffer *text_buffer;
@@ -478,10 +535,12 @@ markdown_textview_set_text(MarkdownTextView * self,
     
     lines = g_strsplit(text, "\n", 0);
     for (line = 0; result && lines[line]; line++) {
-         result = markdown_textview_append_text(self,
-                            (const gchar *)lines[line]);
+         result = append_text(self, (const gchar *)lines[line]);
     }
     g_strfreev(lines);
+
+    load_images(self);
+    g_signal_emit(self, markdown_textview_signals[FILE_LOAD_COMPLETE], 0, NULL);
     
     return result;
 }                           
@@ -519,6 +578,8 @@ markdown_textview_load_file(MarkdownTextView * self,
 	    g_free(line);
 	}
 	fclose(text_file);
+	
+	load_images(self);
 	
         g_signal_emit(self, markdown_textview_signals[FILE_LOAD_COMPLETE], 0, file_name);
 
