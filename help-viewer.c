@@ -143,12 +143,18 @@ help_viewer_new (const gchar *help_file)
   GtkWidget *scrolledhelp_viewer;
   GtkWidget *markdown_textview;
   GtkWidget *status_bar;
+  GdkPixbuf *icon;
 
   help_viewer = gtk_window_new (GTK_WINDOW_TOPLEVEL);
   gtk_widget_set_size_request (help_viewer, 500, 400);
   gtk_window_set_title (GTK_WINDOW (help_viewer), "Help Viewer");
   
-
+  icon = gtk_widget_render_icon(help_viewer, GTK_STOCK_HELP, 
+                                GTK_ICON_SIZE_DIALOG,
+                                NULL);
+  gtk_window_set_icon(GTK_WINDOW(help_viewer), icon);
+  g_object_unref(icon);
+  
   vbox = gtk_vbox_new (FALSE, 0);
   gtk_widget_show (vbox);
   gtk_container_add (GTK_CONTAINER (help_viewer), vbox);
@@ -252,7 +258,7 @@ int main(int argc, char **argv)
     
     gtk_init(&argc, &argv);
     
-    hv = help_viewer_new("teste.markdown");
+    hv = help_viewer_new("README");
     gtk_widget_show_all(hv->window);
     
     gtk_main();
