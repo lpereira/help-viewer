@@ -16,6 +16,7 @@
  *    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
+#include <stdlib.h>
 #include <gtk/gtk.h>
 #include "markdown-text-view.h"
 
@@ -251,7 +252,8 @@ help_viewer_new (const gchar *help_file)
   g_signal_connect(btn_back, "clicked", G_CALLBACK(back_clicked), hv);
   g_signal_connect(btn_forward, "clicked", G_CALLBACK(forward_clicked), hv);
   
-  gtk_statusbar_get_context_id(GTK_STATUSBAR(status_bar), "bla");
+  g_signal_connect(help_viewer, "destroy", G_CALLBACK(exit), NULL);
+  
   markdown_textview_load_file(MARKDOWN_TEXTVIEW(markdown_textview), help_file);
 
   return hv;
