@@ -44,6 +44,7 @@ struct _MarkdownTextView {
 
     EggMarkdown *markdown;
     gboolean hovering_over_link;
+    gchar *image_directory;
 };
 
 struct _MarkdownTextViewClass {
@@ -61,6 +62,8 @@ gboolean	 markdown_textview_load_file(MarkdownTextView * textview,
 gboolean 	 markdown_textview_set_text(MarkdownTextView * textview,
                                             const gchar * text);
 void		 markdown_textview_clear(MarkdownTextView * textview);
+void		 markdown_textview_set_image_directory(MarkdownTextView * self,
+                                                       const gchar * directory);
 
 G_END_DECLS
 

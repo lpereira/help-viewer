@@ -492,13 +492,23 @@ egg_markdown_to_text_line_format_sections (EggMarkdown *self, const gchar *line)
 
 	/* smart quoting */
 	if (self->priv->smart_quoting) {
-		temp = data;
-		data = egg_markdown_to_text_line_formatter (temp, "&quot;", "“", "”");
-		g_free (temp);
+	        if (self->priv->escape) {
+                     temp = data;
+                     data = egg_markdown_to_text_line_formatter (temp, "&quot;", "“", "”");
+                     g_free (temp);
 
-		temp = data;
-		data = egg_markdown_to_text_line_formatter (temp, "&apos;", "‘", "’");
-		g_free (temp);
+                     temp = data;
+                     data = egg_markdown_to_text_line_formatter (temp, "&apos;", "‘", "’");
+                     g_free (temp);
+                } else {
+                     temp = data;
+                     data = egg_markdown_to_text_line_formatter (temp, "\"", "“", "”");
+                     g_free (temp);
+
+                     temp = data;
+                     data = egg_markdown_to_text_line_formatter (temp, "'", "‘", "’");
+                     g_free (temp);
+                }
 	}
 
 	/* image */

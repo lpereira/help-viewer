@@ -16,6 +16,7 @@
  *    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
+#include <string.h>
 #include <stdlib.h>
 #include <gtk/gtk.h>
 #include "markdown-text-view.h"
@@ -27,10 +28,14 @@ struct _HelpViewer {
     
     GtkWidget *btn_back, *btn_forward;
     GtkWidget *text_view;
+    GtkWidget *text_search;
     
     GSList *back_stack, *forward_stack;
     gchar *current_file;
+    gchar *help_directory;
 };
+
+static void do_search(HelpViewer *hv, gchar *text);
 
 static void forward_clicked(GtkWidget *widget, gpointer data)
 {
@@ -44,7 +49,11 @@ static void forward_clicked(GtkWidget *widget, gpointer data)
     gtk_widget_set_sensitive(hv->btn_back, TRUE);
 
     /* loads the new current file */
-    markdown_textview_load_file(MARKDOWN_TEXTVIEW(hv->text_view), hv->forward_stack->data);
+    if (g_str_has_prefix(hv->forward_stack->data, "search://")) {
+        do_search(hv, hv->forward_stack->data + sizeof("search://") - 1);
+    } else {
+        markdown_textview_load_file(MARKDOWN_TEXTVIEW(hv->text_view), hv->forward_stack->data);
+    }
     
     /* pops the stack */
     temp = hv->forward_stack->next;
@@ -70,7 +79,11 @@ static void back_clicked(GtkWidget *widget, gpointer data)
     gtk_widget_set_sensitive(hv->btn_forward, TRUE);
 
     /* loads the new current file */
-    markdown_textview_load_file(MARKDOWN_TEXTVIEW(hv->text_view), hv->back_stack->data);
+    if (g_str_has_prefix(hv->back_stack->data, "search://")) {
+        do_search(hv, hv->back_stack->data + sizeof("search://") - 1);
+    } else {
+        markdown_textview_load_file(MARKDOWN_TEXTVIEW(hv->text_view), hv->back_stack->data);
+    }
     
     /* pops the stack */
     temp = hv->back_stack->next;
@@ -126,8 +139,129 @@ static void hovering_over_text(MarkdownTextView *text_view, gpointer data)
     gtk_statusbar_pop(GTK_STATUSBAR(hv->status_bar), 1);
 }
 
+static void do_search(HelpViewer *hv, gchar *text)
+{
+    GString *markdown;
+    GDir *dir;
+    gchar **terms;
+    gint no_results = 0;
+    int term;
+    
+    /*
+     * FIXME: This search is currently pretty slow; think on a better way to do search. 
+     * Ideas:
+     * - Build a index the first time the help file is opened
+     * - Search only titles and subtitles
+     */
+    
+    terms = g_strsplit(text, " ", 0);
+    markdown = g_string_new("");
+    
+    g_string_append_printf(markdown, "# Search Results (%s)\n", text);
+    
+    gtk_widget_set_sensitive(hv->window, FALSE);
+    
+    if ((dir = g_dir_open(hv->help_directory, 0, NULL))) {
+        const gchar *name;
+        
+        while ((name = g_dir_read_name(dir))) {
+#if GTK_CHECK_VERSION(2,16,0)
+            gtk_entry_progress_pulse(GTK_ENTRY(hv->text_search));
+#endif	/* GTK_CHECK_VERSION(2,16,0) */
+            
+            if (g_str_has_suffix(name, ".hlp")) {
+                FILE *file;
+                gchar *path;
+                gchar buffer[256];
+                
+                path = g_build_filename(hv->help_directory, name, NULL);
+                if ((file = fopen(path, "rb"))) {
+                    gboolean found = FALSE;
+                    gchar *title = NULL;
+                    
+                    while (!found && fgets(buffer, sizeof buffer, file)) {
+                        if (!title && (g_str_has_prefix(buffer, "# ") || g_str_has_prefix(buffer, " # "))) {
+                            title = g_strstrip(strchr(buffer, '#') + 1);
+                            title = g_strdup(title);
+                        }
+                        
+                        for (term = 0; !found && terms[term]; term++) {
+                            found = strstr(buffer, terms[term]) != NULL;
+                        }
+                    }
+                    
+                    fclose(file);
+
+                    if (found) {
+                        no_results++;
+                        
+                        if (title) {
+                              g_string_append_printf(markdown,
+                                                     "* [%s %s]\n", name, title);
+                        } else {
+                              g_string_append_printf(markdown,
+                                                     "* [%s %s]\n", name, name);
+                        }
+                        break;
+                    }
+                    
+                    g_free(title);
+                }
+                
+                g_free(path);
+            }
+        }
+        
+        g_dir_close(dir);
+    }
+    
+    g_strfreev(terms);
+    
+    if (no_results == 0) {
+        g_string_append_printf(markdown,
+                               "Search returned no results.");
+    } else {
+        g_string_append_printf(markdown,
+                               "****\n%d results found.", no_results);
+    }
+    
+    /* shows the results inside the textview */
+    markdown_textview_set_text(MARKDOWN_TEXTVIEW(hv->text_view), markdown->str);
+    g_string_free(markdown, TRUE);
+
+    g_free(hv->current_file);
+    hv->current_file = g_strdup_printf("search://%s", text);
+
+#if GTK_CHECK_VERSION(2,16,0)
+    gtk_entry_set_progress_fraction(GTK_ENTRY(hv->text_search), 0.0f);
+#endif	/* GTK_CHECK_VERSION(2,16,0) */
+    gtk_widget_set_sensitive(hv->window, TRUE);
+}
+
+static void activate(GtkEntry *entry, gpointer data)
+{
+    HelpViewer *hv = (HelpViewer *)data;
+    
+    /* adds the current file to the back stack (before loading the new file */
+    hv->back_stack = g_slist_prepend(hv->back_stack, g_strdup(hv->current_file));
+    gtk_widget_set_sensitive(hv->btn_back, TRUE);
+
+    do_search((HelpViewer *)data, (gchar *)gtk_entry_get_text(entry));
+}
+
+static void home_clicked(GtkWidget *button, gpointer data)
+{
+    HelpViewer *hv = (HelpViewer *)data;
+    
+    /* adds the current file to the back stack (before loading the new file */
+    hv->back_stack = g_slist_prepend(hv->back_stack, g_strdup(hv->current_file));
+    gtk_widget_set_sensitive(hv->btn_back, TRUE);
+
+    markdown_textview_load_file(MARKDOWN_TEXTVIEW(hv->text_view), "index.hlp");
+}
+
 HelpViewer *
-help_viewer_new (const gchar *help_file)
+help_viewer_new (const gchar *help_dir)
 {
   HelpViewer *hv;
   GtkWidget *help_viewer;
@@ -138,7 +272,6 @@ help_viewer_new (const gchar *help_file)
   GtkWidget *btn_back;
   GtkWidget *btn_forward;
   GtkWidget *separatortoolitem1;
-  GtkWidget *btn_home;
   GtkWidget *toolbar2;
   GtkWidget *toolitem3;
 #if !GTK_CHECK_VERSION(2,16,0)
@@ -149,6 +282,9 @@ help_viewer_new (const gchar *help_file)
   GtkWidget *scrolledhelp_viewer;
   GtkWidget *markdown_textview;
   GtkWidget *status_bar;
+  GtkWidget *separatortoolitem;
+  GtkWidget *btn_home;
+  
   GdkPixbuf *icon;
 
   help_viewer = gtk_window_new (GTK_WINDOW_TOPLEVEL);
@@ -221,7 +357,9 @@ help_viewer_new (const gchar *help_file)
   gtk_container_add (GTK_CONTAINER (toolitem4), txt_search);
   gtk_entry_set_invisible_char (GTK_ENTRY (txt_search), 9679);
 #if GTK_CHECK_VERSION(2,16,0)
-  gtk_entry_set_icon_from_stock(GTK_ENTRY(txt_search), GTK_ENTRY_ICON_SECONDARY, GTK_STOCK_FIND);
+  gtk_entry_set_icon_from_stock(GTK_ENTRY(txt_search),
+                                GTK_ENTRY_ICON_SECONDARY,
+                                GTK_STOCK_FIND);
 #endif	/* GTK_CHECK_VERSION(2,16,0) */
 
   scrolledhelp_viewer = gtk_scrolled_window_new (NULL, NULL);
@@ -230,6 +368,7 @@ help_viewer_new (const gchar *help_file)
   gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrolledhelp_viewer), GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
 
   markdown_textview = markdown_textview_new();
+  markdown_textview_set_image_directory(MARKDOWN_TEXTVIEW(markdown_textview), help_dir);
   gtk_widget_show (markdown_textview);
   gtk_container_add (GTK_CONTAINER (scrolledhelp_viewer), markdown_textview);
 
@@ -243,6 +382,8 @@ help_viewer_new (const gchar *help_file)
   hv->btn_back = btn_back;
   hv->btn_forward = btn_forward;
   hv->text_view = markdown_textview;
+  hv->text_search = txt_search;
+  hv->help_directory = g_strdup(help_dir);
 
   g_signal_connect(markdown_textview, "link-clicked", G_CALLBACK(link_clicked), hv);
   g_signal_connect(markdown_textview, "hovering-over-link", G_CALLBACK(hovering_over_link), hv);
@@ -251,10 +392,22 @@ help_viewer_new (const gchar *help_file)
 
   g_signal_connect(btn_back, "clicked", G_CALLBACK(back_clicked), hv);
   g_signal_connect(btn_forward, "clicked", G_CALLBACK(forward_clicked), hv);
-  
+  g_signal_connect(btn_home, "clicked", G_CALLBACK(home_clicked), hv);
+
   g_signal_connect(help_viewer, "destroy", G_CALLBACK(exit), NULL);
-  
-  markdown_textview_load_file(MARKDOWN_TEXTVIEW(markdown_textview), help_file);
+  g_signal_connect(txt_search, "activate", G_CALLBACK(activate), hv);
+                          
+  if (!markdown_textview_load_file(MARKDOWN_TEXTVIEW(markdown_textview), "index.hlp")) {
+      GtkWidget	*dialog;
+
+      dialog = gtk_message_dialog_new(NULL,
+                                      GTK_DIALOG_DESTROY_WITH_PARENT,
+                                      GTK_MESSAGE_ERROR,
+                                      GTK_BUTTONS_CLOSE,
+                                      "Cannot open help index file.");
+      gtk_dialog_run(GTK_DIALOG(dialog));
+      gtk_widget_destroy(dialog);
+  }
 
   return hv;
 }
@@ -266,7 +419,7 @@ int main(int argc, char **argv)
     
     gtk_init(&argc, &argv);
     
-    hv = help_viewer_new("README");
+    hv = help_viewer_new("documentation");
     gtk_widget_show_all(hv->window);
     
     gtk_main();

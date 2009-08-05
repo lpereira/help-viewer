@@ -1,0 +1,62 @@
+# Developer Documentation
+
+# `MarkdownTextView`
+
+`MarkdownTextView` is a `GtkTextView` subclass, that will automatically format text according to a subset of the Markdown syntax.
+Although it is possible to use `GtkTextView` and `EggMarkdown`, links and images will not work as expected: links won't be clickable, and the alternative text for images will appear instead.
+
+## Current limitations
+
+Currently, certain features are implemented in a very hackish manner, since extending Pango's markup language isn't so simple. For instance, hyperlinks and images (originally not supported by the original `EggMarkdown`) are implemented using rarely-used attributes of Pango's `<span>` tag; they are rendered fine with `MarkdownTextView` subclass used by Help Viewer, but would do nothing (besides having different style) on a regular `GtkTextView`.
+This isn't a problem for Help Viewer users and documentation writers, but might be important if we ever need to add support for other things, such as tables (which is scheduled to be implemented; probably not as complex as HTML tables, though).
+Another thing that isn't working is nesting hyperlinks (and images) with regular text formatters.
+
+# Structure
+
+`typedef struct _MarkdownTextView MarkdownTextView;`
+`struct _MarkdownTextView {`
+`   **<private>**`
+`};`
+
+The `MarkdownTextView` structure is opaque and its members shouldn't be accessed directly.
+
+# Signals
+
+## `link-clicked`
+
+**`void link_clicked(MarkdownTextView *text_view, gchar *uri);`**
+
+Emitted when a link is clicked.
+
+* *text_view*: The instance that received the click;
+* *uri*: The URI to the link; it is owned by the instance and shouldn't be modified or freed.
+
+## `hovering-over-link`
+
+**`void hoveringoverink(MarkdownTextView *text_view, gchar *uri);`**
+
+Emitted when the mouse cursor is hovering over a link.
+
+* *text_view*: The instance that received the click;
+* *uri*: The URI to the link; it is owned by the instance and shouldn't be modified or freed.
+
+## `hovering-over-text`
+
+**`void hoveringovertext(MarkdownTextView *text_view);`**
+
+Emitted when the mouse cursor is back from hovering over a link and is hovering over regular text again.
+
+* *text_view*: The instance that received the click.
+
+## `file-load-complete`
+
+**`void fileloadcomplete(MarkdownTextView *text_view, gchar *file);`**
+
+Emitted when a file has been successfully loaded.
+
+* *text_view*: The instance that received the click.
+* *uri*: The path to the file; it is owned by the instance and shouldn't be modified or freed.
+
+# Methods
+
+## `MarkdownTextView *markdown_textview_new();`

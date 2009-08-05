@@ -465,9 +465,11 @@ load_images(MarkdownTextView * self)
 
            if (is_underline == 2 && lang) {
                GdkPixbuf *pixbuf;
+               gchar *path;
                
                image_path = egg_markdown_get_link_uri(self->markdown, atoi(lang));
-               pixbuf = gdk_pixbuf_new_from_file(image_path, NULL);
+               path = g_build_filename(self->image_directory, image_path, NULL);
+               pixbuf = gdk_pixbuf_new_from_file(path, NULL);
                if (pixbuf) {
                    GtkTextMark *mark;
                    GtkTextIter start;
@@ -486,6 +488,7 @@ load_images(MarkdownTextView * self)
                
                g_free(image_path);
                g_free(lang);
+               g_free(path);
                break;
            }
 
@@ -513,6 +516,7 @@ append_text(MarkdownTextView * self,
     line = egg_markdown_parse(self->markdown, text);
     if (line && *line) {
         gtk_text_buffer_insert_markup(text_buffer, &iter, line);
+        gtk_text_buffer_insert(text_buffer, &iter, "\n", 1);
         g_free(line);
         
         return TRUE;
@@ -540,7 +544,6 @@ markdown_textview_set_text(MarkdownTextView * self,
     g_strfreev(lines);
 
     load_images(self);
-    g_signal_emit(self, markdown_textview_signals[FILE_LOAD_COMPLETE], 0, NULL);
     
     return result;
 }                           
@@ -550,11 +553,14 @@ markdown_textview_load_file(MarkdownTextView * self,
 			    const gchar * file_name)
 {
     FILE *text_file;
+    gchar *path;
 
     g_return_val_if_fail(IS_MARKDOWN_TEXTVIEW(self), FALSE);
+    
+    path = g_build_filename(self->image_directory, file_name, NULL);
 
     /* we do assume UTF-8 encoding */
-    if ((text_file = fopen((gchar *) file_name, "rb"))) {
+    if ((text_file = fopen(path, "rb"))) {
 	GtkTextBuffer *text_buffer;
 	GtkTextIter iter;
 	gchar *line;
@@ -582,16 +588,30 @@ markdown_textview_load_file(MarkdownTextView * self,
 	load_images(self);
 	
         g_signal_emit(self, markdown_textview_signals[FILE_LOAD_COMPLETE], 0, file_name);
+        
+        g_free(path);
 
 	return TRUE;
     }
+    
+    g_free(path);
 
     return FALSE;
+}
+
+void
+markdown_textview_set_image_directory(MarkdownTextView * self, const gchar *directory)
+{
+    g_return_if_fail(IS_MARKDOWN_TEXTVIEW(self));
+
+    g_free(self->image_directory);
+    self->image_directory = g_strdup(directory);
 }
 
 static void markdown_textview_init(MarkdownTextView * self)
 {
     self->markdown = egg_markdown_new();
+    self->image_directory = g_strdup(".");
 
     egg_markdown_set_output(self->markdown, EGG_MARKDOWN_OUTPUT_PANGO);
     egg_markdown_set_escape(self->markdown, TRUE);
@@ -606,7 +626,7 @@ static void markdown_textview_init(MarkdownTextView * self)
     gtk_text_view_set_right_margin(GTK_TEXT_VIEW(self), 10);
     gtk_text_view_set_pixels_above_lines(GTK_TEXT_VIEW(self), 3);
     gtk_text_view_set_pixels_below_lines(GTK_TEXT_VIEW(self), 3);
-      
+    
     g_signal_connect(self, "event-after",
 		     G_CALLBACK(event_after), NULL);
     g_signal_connect(self, "key-press-event",
