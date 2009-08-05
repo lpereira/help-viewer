@@ -55,7 +55,6 @@ static void markdown_textview_class_init(MarkdownTextViewClass * klass)
     }
 
     object_class = G_OBJECT_CLASS(klass);
-    object_class->finalize = markdown_textview_finalize;
 
     markdown_textview_signals[LINK_CLICKED] = g_signal_new(
              "link-clicked",
@@ -640,14 +639,9 @@ static void markdown_textview_init(MarkdownTextView * self)
 static void markdown_textview_finalize(GObject * object)
 {
     MarkdownTextView *self;
-    MarkdownTextViewClass *klass;
 
     g_return_if_fail(IS_MARKDOWN_TEXTVIEW(object));
 
     self = MARKDOWN_TEXTVIEW(object);
-    klass = MARKDOWN_TEXTVIEW_GET_CLASS(object);
-
     g_object_unref(self->markdown);
-
-    G_OBJECT_CLASS(klass)->finalize(object);
 }

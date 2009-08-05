@@ -16,6 +16,7 @@
  *    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
+#define _GNU_SOURCE		/* for strcasestr() */
 #include <string.h>
 #include <stdlib.h>
 #include <gtk/gtk.h>
@@ -185,7 +186,19 @@ static void do_search(HelpViewer *hv, gchar *text)
                         }
                         
                         for (term = 0; !found && terms[term]; term++) {
-                            found = strstr(buffer, terms[term]) != NULL;
+#ifdef strcasestr
+                            found = strcasestr(buffer, terms[term]) != NULL;
+#else
+                            gchar *upper1, *upper2;
+                            
+                            upper1 = g_utf8_strup(buffer, -1);
+                            upper2 = g_utf8_strup(terms[term], -1);
+                            
+                            found = strstr(upper1, upper2) != NULL;
+                            
+                            g_free(upper1);
+                            g_free(upper2);
+#endif
                         }
                     }
                     
