@@ -156,7 +156,6 @@ static void do_search(HelpViewer *hv, gchar *text)
     
     terms = g_strsplit(text, " ", 0);
     markdown = g_string_new("# Search Results\n");
-    
     g_string_append_printf(markdown, "Search terms: *%s*\n****\n", text);
     
     gtk_widget_set_sensitive(hv->window, FALSE);
@@ -213,7 +212,6 @@ static void do_search(HelpViewer *hv, gchar *text)
         g_dir_close(dir);
     }
     
-    g_strfreev(terms);
     
     if (no_results == 0) {
         g_string_append_printf(markdown,
@@ -225,7 +223,6 @@ static void do_search(HelpViewer *hv, gchar *text)
     
     /* shows the results inside the textview */
     markdown_textview_set_text(MARKDOWN_TEXTVIEW(hv->text_view), markdown->str);
-    g_string_free(markdown, TRUE);
 
     g_free(hv->current_file);
     hv->current_file = g_strdup_printf("search://%s", text);
@@ -234,6 +231,9 @@ static void do_search(HelpViewer *hv, gchar *text)
     gtk_entry_set_progress_fraction(GTK_ENTRY(hv->text_search), 0.0f);
 #endif	/* GTK_CHECK_VERSION(2,16,0) */
     gtk_widget_set_sensitive(hv->window, TRUE);
+
+    g_string_free(markdown, TRUE);
+    g_strfreev(terms);
 }
 
 static void activate(GtkEntry *entry, gpointer data)
@@ -259,7 +259,7 @@ static void home_clicked(GtkWidget *button, gpointer data)
 }
 
 HelpViewer *
-help_viewer_new (const gchar *help_dir)
+help_viewer_new (const gchar *help_dir, const gchar *help_file)
 {
   HelpViewer *hv;
   GtkWidget *help_viewer;
@@ -395,7 +395,7 @@ help_viewer_new (const gchar *help_dir)
   g_signal_connect(help_viewer, "destroy", G_CALLBACK(exit), NULL);
   g_signal_connect(txt_search, "activate", G_CALLBACK(activate), hv);
                           
-  if (!markdown_textview_load_file(MARKDOWN_TEXTVIEW(markdown_textview), "index.hlp")) {
+  if (!markdown_textview_load_file(MARKDOWN_TEXTVIEW(markdown_textview), help_file ? help_file : "index.hlp")) {
       GtkWidget	*dialog;
 
       dialog = gtk_message_dialog_new(NULL,
@@ -417,7 +417,7 @@ int main(int argc, char **argv)
     
     gtk_init(&argc, &argv);
     
-    hv = help_viewer_new("documentation");
+    hv = help_viewer_new("documentation", NULL);
     gtk_widget_show_all(hv->window);
     
     gtk_main();
