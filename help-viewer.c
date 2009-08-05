@@ -190,8 +190,6 @@ static void do_search(HelpViewer *hv, gchar *text)
                         }
                     }
                     
-                    fclose(file);
-
                     if (found) {
                         no_results++;
                         
@@ -202,10 +200,10 @@ static void do_search(HelpViewer *hv, gchar *text)
                               g_string_append_printf(markdown,
                                                      "* [%s %s]\n", name, name);
                         }
-                        break;
                     }
                     
                     g_free(title);
+                    fclose(file);
                 }
                 
                 g_free(path);
