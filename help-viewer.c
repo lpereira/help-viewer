@@ -155,9 +155,9 @@ static void do_search(HelpViewer *hv, gchar *text)
      */
     
     terms = g_strsplit(text, " ", 0);
-    markdown = g_string_new("");
+    markdown = g_string_new("# Search Results\n");
     
-    g_string_append_printf(markdown, "# Search Results (%s)\n", text);
+    g_string_append_printf(markdown, "Search terms: *%s*\n****\n", text);
     
     gtk_widget_set_sensitive(hv->window, FALSE);
     
